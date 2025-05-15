@@ -2,13 +2,24 @@ package presence
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"chat-backend/internal/chat"
+	"chat-backend/internal/redisdb"
 
 	"github.com/gorilla/websocket"
+
+	"sync"
 )
+
+var Clients sync.Map
+
+type ChatPayload struct {
+	From    string `json:"from"`
+	Message string `json:"message"`
+}
 
 type Client struct {
 	UserID string
@@ -16,14 +27,22 @@ type Client struct {
 	Store  *chat.Store
 }
 
+// Use the shared Clients variable from shared.go
+
 func NewClient(userID string, conn *websocket.Conn, store *chat.Store) *Client {
-	return &Client{UserID: userID, Conn: conn, Store: store}
+	client := &Client{
+		UserID: userID,
+		Conn:   conn,
+		Store:  store,
+	}
+	Clients.Store(userID, client) // Store the client in the sync.Map
+	return client
 }
 
 func (c *Client) Listen() {
 	defer func() {
 		c.Conn.Close()
-		Unregister(c)
+		Clients.Delete(c.UserID)
 	}()
 
 	for {
@@ -46,6 +65,33 @@ func (c *Client) Listen() {
 			}
 			if err := c.Store.SaveMessage(context.Background(), message); err != nil {
 				log.Println("Erro ao salvar mensagem:", err)
+			}
+
+			// Publicar a mensagem no canal Redis
+			payload := ChatPayload{
+				From:    c.UserID,
+				Message: content,
+			}
+			payloadBytes, _ := json.Marshal(payload)
+			channel := "chat:" + to
+			redisdb.GetClient().Publish(redisdb.Ctx, channel, payloadBytes)
+			log.Printf("🔔 Mensagem publicada no canal Redis: %s", channel)
+
+			// Notificar o cliente conectado
+			Clients.Range(func(key, value interface{}) bool {
+				log.Printf("📋 Cliente conectado: %v", key)
+				return true
+			})
+			if value, ok := Clients.Load(to); ok {
+				client := value.(*Client)
+				log.Printf("🔔 Cliente encontrado: %s", to)
+				client.Conn.WriteJSON(map[string]interface{}{
+					"type":    "chat",
+					"from":    payload.From,
+					"message": payload.Message,
+				})
+			} else {
+				log.Printf("❌ Cliente %s não está conectado", to)
 			}
 		}
 	}

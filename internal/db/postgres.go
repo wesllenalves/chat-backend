@@ -11,10 +11,12 @@ import (
 
 func Connect() *sql.DB {
 	host := os.Getenv("PGHOST")
-	if host == "" {
-		host = "postgres"
-	}
-	dsn := fmt.Sprintf("postgres://chat:chatpass@%s:5432/chatdb?sslmode=disable", host)
+	user := os.Getenv("PGUSER")
+	password := os.Getenv("PGPASSWORD")
+	database := os.Getenv("PGDATABASE")
+	port := os.Getenv("PGPORT")
+
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, database)
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

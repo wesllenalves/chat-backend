@@ -1,16 +1,12 @@
 package presence
 
 import (
+	// "chat-backend/internal/presence/client" // Removed as the package is not available
 	"encoding/json"
 	"log"
 
 	"chat-backend/internal/redisdb"
 )
-
-type ChatPayload struct {
-	From    string `json:"from"`
-	Message string `json:"message"`
-}
 
 func StartChatSubscriber() {
 	go func() {
@@ -20,20 +16,25 @@ func StartChatSubscriber() {
 		ch := pubsub.Channel()
 
 		for msg := range ch {
+			log.Printf("🔔 Mensagem recebida no canal Redis: %s", msg.Channel)
 			var payload ChatPayload
 			if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
-				log.Println("❌ Erro ao parsear chat payload:", err)
+				// Removed unused variable declaration
 				continue
 			}
 
 			userID := msg.Channel[len("chat:"):] // extrai o ID do destinatário
+			log.Printf("🔔 Mensagem destinada ao usuário: %s", userID)
 
 			if client, ok := clients[userID]; ok {
+				log.Printf("🔔 Enviando mensagem para o cliente conectado: %s", userID)
 				client.Conn.WriteJSON(map[string]interface{}{
 					"type":    "chat",
 					"from":    payload.From,
 					"message": payload.Message,
 				})
+			} else {
+				log.Printf("❌ Cliente %s não está conectado", userID)
 			}
 		}
 	}()

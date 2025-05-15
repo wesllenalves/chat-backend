@@ -8,6 +8,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Use the shared JwtKey from config.go
+
 func GenerateTokenHandler(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user")
 	if userID == "" {

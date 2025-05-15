@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"chat-backend/internal/auth"
 	"chat-backend/internal/chat"
@@ -11,6 +12,7 @@ import (
 	"chat-backend/internal/redisdb"
 
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 var upgrader = websocket.Upgrader{
@@ -18,6 +20,11 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
+	// Carregar variáveis de ambiente
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️  Arquivo .env não encontrado, usando variáveis de ambiente padrão")
+	}
+
 	// 1. Inicializar Redis
 	log.Println("Inicializando Redis...")
 	redisdb.Init()
@@ -71,6 +78,10 @@ func main() {
 	}))
 
 	// 6. Iniciar o servidor
-	log.Println("🚀 Servidor iniciado na porta 8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	port := os.Getenv("SERVER_PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("🚀 Servidor iniciado na porta %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

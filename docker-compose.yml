@@ -10,6 +10,8 @@ services:
     command: air
     depends_on:
       - redis
+    env_file:
+      - .env
 
   redis:
     image: redis:alpine
