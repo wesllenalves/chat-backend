@@ -28,3 +28,28 @@ func (s *Store) SaveMessage(ctx context.Context, msg Message) error {
 	_, err := s.DB.ExecContext(ctx, query, msg.From, msg.To, msg.Content, msg.Timestamp)
 	return err
 }
+
+func (s *Store) SaveGroupMessage(ctx context.Context, groupID int, sender, content string) error {
+	_, err := s.DB.ExecContext(ctx,
+		"INSERT INTO group_messages (group_id, sender, content) VALUES ($1, $2, $3)",
+		groupID, sender, content)
+	return err
+}
+
+func (s *Store) GetGroupMembers(groupID int) ([]string, error) {
+	rows, err := s.DB.Query("SELECT user_id FROM group_members WHERE group_id = $1", groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		members = append(members, userID)
+	}
+	return members, nil
+}

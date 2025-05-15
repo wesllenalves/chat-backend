@@ -1,10 +1,11 @@
 package presence
 
 import (
-	// "chat-backend/internal/presence/client" // Removed as the package is not available
 	"encoding/json"
 	"log"
+	"strconv"
 
+	"chat-backend/internal/chat"
 	"chat-backend/internal/redisdb"
 )
 
@@ -19,7 +20,6 @@ func StartChatSubscriber() {
 			log.Printf("🔔 Mensagem recebida no canal Redis: %s", msg.Channel)
 			var payload ChatPayload
 			if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
-				// Removed unused variable declaration
 				continue
 			}
 
@@ -38,4 +38,54 @@ func StartChatSubscriber() {
 			}
 		}
 	}()
+}
+
+func StartGroupChatSubscriber(store *chat.Store) {
+	go func() {
+		log.Println("📡 Listening on Redis Pub/Sub: group:*")
+		pubsub := redisdb.GetClient().PSubscribe(redisdb.Ctx, "group:*")
+		ch := pubsub.Channel()
+		for msg := range ch {
+			groupIDstr := msg.Channel[len("group:"):]
+			var payload ChatPayload
+			if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
+				log.Println("Erro ao parsear payload de grupo:", err)
+				continue
+			}
+			groupID, err := strconv.Atoi(groupIDstr)
+			if err != nil {
+				log.Println("ID de grupo inválido:", groupIDstr)
+				continue
+			}
+			memberIDs, err := store.GetGroupMembers(groupID)
+			if err != nil {
+				log.Printf("Erro ao buscar membros do grupo %d: %v", groupID, err)
+				continue
+			}
+			for _, userID := range memberIDs {
+				if value, ok := Clients.Load(userID); ok {
+					client := value.(*Client)
+					client.Conn.WriteJSON(map[string]interface{}{
+						"type":    "group",
+						"groupId": groupID,
+						"from":    payload.From,
+						"message": payload.Message,
+					})
+				}
+			}
+		}
+	}()
+}
+
+func GetGroupMembersFromCacheOrDB(store *chat.Store, groupID string) []string {
+	id, err := strconv.Atoi(groupID)
+	if err != nil {
+		return []string{}
+	}
+	members, err := store.GetGroupMembers(id)
+	if err != nil {
+		log.Printf("Erro ao buscar membros do grupo %s: %v", groupID, err)
+		return []string{}
+	}
+	return members
 }

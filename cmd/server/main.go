@@ -8,6 +8,7 @@ import (
 	"chat-backend/internal/auth"
 	"chat-backend/internal/chat"
 	"chat-backend/internal/db"
+	"chat-backend/internal/group"
 	"chat-backend/internal/presence"
 	"chat-backend/internal/redisdb"
 
@@ -39,6 +40,8 @@ func main() {
 	log.Println("Iniciando o assinante de presença...")
 	presence.StartPresenceSubscriber()
 	log.Println("Assinante de presença iniciado.")
+
+	go presence.StartGroupChatSubscriber(store)
 
 	// 4. Endpoint para gerar JWT (GET /token?user=joao)
 	http.HandleFunc("/token", auth.GenerateTokenHandler)
@@ -76,6 +79,10 @@ func main() {
 			client.Listen()
 		}()
 	}))
+
+	http.HandleFunc("/groups", group.CreateGroupHandler(sqlDB))              // POST para criar grupo
+	http.HandleFunc("/groups/list", group.ListGroupsHandler(sqlDB))          // GET para listar grupos
+	http.HandleFunc("/groups/members", group.ListGroupMembersHandler(sqlDB)) // GET para listar membros de um grupo
 
 	// 6. Iniciar o servidor
 	port := os.Getenv("SERVER_PORT")

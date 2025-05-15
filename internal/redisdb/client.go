@@ -73,3 +73,13 @@ func PublishMessage(c *ChatContext, to string, content string, okTo bool, okCont
 		}
 	}
 }
+
+func PublishGroupMessage(groupID int, from, content string) error {
+	payload := map[string]interface{}{
+		"from":    from,
+		"message": content,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+	channel := fmt.Sprintf("group:%d", groupID)
+	return GetClient().Publish(Ctx, channel, payloadBytes).Err()
+}

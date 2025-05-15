@@ -53,6 +53,21 @@ func (c *Client) Listen() {
 		}
 		log.Printf("[📩] Message from %s: %v", c.UserID, msg)
 
+		// --- Aqui entra o trecho para mensagem de grupo ---
+		if groupIDf, ok := msg["group_id"].(float64); ok {
+			content, okContent := msg["content"].(string)
+			if okContent {
+				groupID := int(groupIDf)
+				if err := redisdb.PublishGroupMessage(groupID, c.UserID, content); err != nil {
+					log.Printf("Erro ao publicar mensagem de grupo no Redis: %v", err)
+				} else {
+					log.Printf("🔔 Mensagem de grupo publicada no canal Redis: group:%d", groupID)
+				}
+			}
+			continue
+		}
+		// --- Fim do trecho para mensagem de grupo ---
+
 		// Processar e salvar a mensagem
 		to, okTo := msg["to"].(string)
 		content, okContent := msg["content"].(string)
